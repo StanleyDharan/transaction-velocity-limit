@@ -1,21 +1,15 @@
 package com.venn.velocitylimits.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.venn.velocitylimits.model.LoadRequest;
 import com.venn.velocitylimits.model.LoadResponse;
 import com.venn.velocitylimits.repository.LoadTransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.io.IOException;
-import java.nio.file.*;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,17 +24,9 @@ public class LoadServiceTest {
     @Autowired
     private LoadTransactionRepository repository;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Value("${velocity-limits.output-dir}")
-    private String outputDir;
-
     @BeforeEach
-    void setUp() throws IOException {
+    void setUp() {
         repository.deleteAll();
-        Path outputFile = Paths.get(outputDir, "output.txt");
-        Files.deleteIfExists(outputFile);
     }
 
     private LoadRequest createRequest(String id, String customerId, String amount, String time) {
@@ -192,35 +178,4 @@ public class LoadServiceTest {
         assertTrue(resp.get().isAccepted());
     }
 
-    @Test
-    void testResponseWrittenToOutputFile() throws IOException {
-        loadService.processLoad(createRequest("1", "100", "$1000.00", "2000-01-03T10:00:00Z"));
-        loadService.processLoad(createRequest("2", "100", "$6000.00", "2000-01-03T11:00:00Z"));
-
-        Path outputFile = Paths.get(outputDir, "output.txt");
-        assertTrue(Files.exists(outputFile), "output.txt should be created");
-
-        List<String> lines = Files.readAllLines(outputFile);
-        assertEquals(2, lines.size(), "Should have 2 lines (one per non-duplicate load)");
-
-        JsonNode first = objectMapper.readTree(lines.get(0));
-        assertEquals("1", first.get("id").asText());
-        assertEquals("100", first.get("customer_id").asText());
-        assertTrue(first.get("accepted").asBoolean());
-
-        JsonNode second = objectMapper.readTree(lines.get(1));
-        assertEquals("2", second.get("id").asText());
-        assertEquals("100", second.get("customer_id").asText());
-        assertFalse(second.get("accepted").asBoolean());
-    }
-
-    @Test
-    void testDuplicateLoadNotWrittenToOutputFile() throws IOException {
-        loadService.processLoad(createRequest("1", "100", "$1000.00", "2000-01-03T10:00:00Z"));
-        loadService.processLoad(createRequest("1", "100", "$1000.00", "2000-01-03T10:00:00Z")); // duplicate
-
-        Path outputFile = Paths.get(outputDir, "output.txt");
-        List<String> lines = Files.readAllLines(outputFile);
-        assertEquals(1, lines.size(), "Duplicate should not be written to output file");
-    }
 }

@@ -3,6 +3,7 @@ package com.venn.velocitylimits.controller;
 import com.venn.velocitylimits.model.LoadRequest;
 import com.venn.velocitylimits.model.LoadResponse;
 import com.venn.velocitylimits.service.LoadService;
+import com.venn.velocitylimits.service.ResponseFileWriter;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +19,11 @@ public class LoadController {
     private static final Logger log = LoggerFactory.getLogger(LoadController.class);
 
     private final LoadService loadService;
+    private final ResponseFileWriter responseFileWriter;
 
-    public LoadController(LoadService loadService) {
+    public LoadController(LoadService loadService, ResponseFileWriter responseFileWriter) {
         this.loadService = loadService;
+        this.responseFileWriter = responseFileWriter;
     }
 
     @PostMapping("/loads")
@@ -38,6 +41,7 @@ public class LoadController {
         }
 
         LoadResponse body = response.get();
+        responseFileWriter.write(body);
         log.info("Response: status=200, id={}, customer_id={}, accepted={}, duration={}ms",
                 body.getId(), body.getCustomerId(), body.isAccepted(), duration);
         return ResponseEntity.ok(body);

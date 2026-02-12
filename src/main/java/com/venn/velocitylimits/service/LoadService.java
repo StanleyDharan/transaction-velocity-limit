@@ -1,17 +1,13 @@
 package com.venn.velocitylimits.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.venn.velocitylimits.model.*;
 import com.venn.velocitylimits.repository.LoadTransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.*;
 import java.time.*;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Optional;
@@ -25,15 +21,9 @@ public class LoadService {
     private static final long DAILY_COUNT_LIMIT = 3;
 
     private final LoadTransactionRepository repository;
-    private final ObjectMapper objectMapper;
-    private final Path outputPath;
 
-    public LoadService(LoadTransactionRepository repository,
-                       ObjectMapper objectMapper,
-                       @Value("${velocity-limits.output-dir:data}") String outputDir) {
+    public LoadService(LoadTransactionRepository repository) {
         this.repository = repository;
-        this.objectMapper = objectMapper;
-        this.outputPath = Paths.get(outputDir, "output.txt");
     }
 
     @Transactional
@@ -110,20 +100,8 @@ public class LoadService {
                     request.getId(), request.getCustomerId(), declineReason);
         }
 
-        // 10. Write response to file and return
-        LoadResponse response = new LoadResponse(request.getId(), request.getCustomerId(), accepted);
-        writeResponseToFile(response);
-        return Optional.of(response);
-    }
-
-    private void writeResponseToFile(LoadResponse response) {
-        try {
-            Files.createDirectories(outputPath.getParent());
-            String line = objectMapper.writeValueAsString(response) + System.lineSeparator();
-            Files.writeString(outputPath, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            log.error("Failed to write response to {}", outputPath, e);
-        }
+        // 10. Return response
+        return Optional.of(new LoadResponse(request.getId(), request.getCustomerId(), accepted));
     }
 
     private BigDecimal parseAmount(String amountStr) {
