@@ -5,7 +5,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "load_transactions")
+@Table(name = "load_transactions", indexes = {
+        @Index(name = "idx_customer_accepted_time", columnList = "customer_id, accepted, time")
+})
 @IdClass(LoadTransactionId.class)
 public class LoadTransaction {
 

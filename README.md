@@ -129,6 +129,10 @@ File writing is deliberately separated from the database transaction -- the `Res
 
 Every non-duplicate response is appended as a JSON line to `data/output.txt`. The output directory is configurable via the `velocity-limits.output-dir` property, defaulting to `data`. File write failures are logged but do not fail the request -- the API response is the source of truth, and the file is a secondary record.
 
+### Database Indexing
+
+A composite index on `(customer_id, accepted, time)` covers all three velocity check queries. SQLite uses the B-tree to jump to the customer, narrow to accepted loads, then range-scan the time window -- avoiding a full table scan on every request. The trade-off is a small write penalty (one extra B-tree update per insert) and additional disk space, but since each request triggers up to 3 read queries against only 1 write, the trade-off favours read performance.
+
 ### Test Isolation Without `@DirtiesContext`
 
 The unit tests use `repository.deleteAll()` in a `@BeforeEach` method instead of `@DirtiesContext(classMode = BEFORE_EACH_TEST_METHOD)`. Both approaches give each test a clean database, but `deleteAll()` reuses the Spring context across all tests while `@DirtiesContext` tears down and rebuilds the entire application context for every test method. This dropped the unit test suite runtime from ~2.7s to ~1.9s.
