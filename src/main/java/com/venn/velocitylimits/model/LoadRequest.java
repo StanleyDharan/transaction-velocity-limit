@@ -1,18 +1,26 @@
 package com.venn.velocitylimits.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 
 public class LoadRequest {
 
+    @NotBlank
     private String id;
 
+    @NotBlank
     @JsonProperty("customer_id")
     private String customerId;
 
+    @NotBlank
+    @Pattern(regexp = "^\\$\\d+(\\.\\d{1,2})?$", message = "must be in $0.00 format")
     @JsonProperty("load_amount")
     private String loadAmount;
 
+    @NotNull
     private Instant time;
 
     public String getId() { return id; }

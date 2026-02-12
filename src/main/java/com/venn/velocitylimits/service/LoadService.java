@@ -38,10 +38,15 @@ public class LoadService {
 
     @Transactional
     public Optional<LoadResponse> processLoad(LoadRequest request) {
+        log.info("Load received: id={}, customer_id={}, amount={}, time={}",
+                request.getId(), request.getCustomerId(), request.getLoadAmount(), request.getTime());
+
         LoadTransactionId txId = new LoadTransactionId(request.getId(), request.getCustomerId());
 
         // 1. Duplicate check
         if (repository.existsById(txId)) {
+            log.info("Load declined: id={}, customer_id={}, reason=duplicate",
+                    request.getId(), request.getCustomerId());
             return Optional.empty();
         }
 
@@ -60,12 +65,14 @@ public class LoadService {
         Instant weekEnd = monday.plusDays(7).atStartOfDay(ZoneOffset.UTC).toInstant();
 
         boolean accepted = true;
+        String declineReason = null;
 
         // 5. Daily count check (>= 3 means decline)
         long dailyCount = repository.countAcceptedByCustomerIdAndTimeBetween(
                 request.getCustomerId(), dayStart, dayEnd);
         if (dailyCount >= DAILY_COUNT_LIMIT) {
             accepted = false;
+            declineReason = String.format("daily_count_limit, count=%d, limit=%d", dailyCount, DAILY_COUNT_LIMIT);
         }
 
         // 6. Daily amount check
@@ -74,6 +81,8 @@ public class LoadService {
                     request.getCustomerId(), dayStart, dayEnd);
             if (dailySum.add(amount).compareTo(DAILY_AMOUNT_LIMIT) > 0) {
                 accepted = false;
+                declineReason = String.format("daily_amount_limit, current_sum=%s, load=%s, limit=%s",
+                        dailySum, amount, DAILY_AMOUNT_LIMIT);
             }
         }
 
@@ -83,6 +92,8 @@ public class LoadService {
                     request.getCustomerId(), weekStart, weekEnd);
             if (weeklySum.add(amount).compareTo(WEEKLY_AMOUNT_LIMIT) > 0) {
                 accepted = false;
+                declineReason = String.format("weekly_amount_limit, current_sum=%s, load=%s, limit=%s",
+                        weeklySum, amount, WEEKLY_AMOUNT_LIMIT);
             }
         }
 
@@ -90,6 +101,14 @@ public class LoadService {
         LoadTransaction tx = new LoadTransaction(
                 request.getId(), request.getCustomerId(), amount, time, accepted);
         repository.save(tx);
+
+        if (accepted) {
+            log.info("Load accepted: id={}, customer_id={}, amount={}",
+                    request.getId(), request.getCustomerId(), amount);
+        } else {
+            log.info("Load declined: id={}, customer_id={}, reason={}",
+                    request.getId(), request.getCustomerId(), declineReason);
+        }
 
         // 10. Write response to file and return
         LoadResponse response = new LoadResponse(request.getId(), request.getCustomerId(), accepted);
