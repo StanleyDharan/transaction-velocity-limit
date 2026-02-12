@@ -55,6 +55,13 @@
         </dependency>
     </dependencies>
 
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/StanleyDharan/transaction-velocity-limit</url>
+        </repository>
+    </distributionManagement>
+
     <build>
         <plugins>
             <plugin>
