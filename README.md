@@ -78,39 +78,9 @@ curl -X POST http://localhost:8080/api/loads \
 make test
 ```
 
-This runs all 13 tests and prints a color-coded summary to the terminal:
-
-```
-========================================
-  TEST REPORT
-========================================
-  PASS   ...VelocityLimitsIntegrationTest > testAllLoadsAgainstExpectedOutput
-  PASS   ...LoadServiceTest > testDailyAmountLimitExceeded
-  PASS   ...LoadServiceTest > testAcceptValidLoad
-  ...
-----------------------------------------
-  Total: 13  |  Passed: 13
-========================================
-
-  Full HTML report: target/site/surefire-report.html
-```
+This runs all tests and prints a color-coded summary to the terminal:
 
 A detailed HTML report is also generated at `target/site/surefire-report.html`.
-
-### Test Suite
-
-**Unit tests** (`LoadServiceTest` -- 12 tests) cover each velocity rule in isolation:
-- Accepting a valid load
-- Duplicate detection returning empty
-- Daily amount limit (exceeded and exactly at boundary)
-- Daily count limit exceeded
-- Weekly amount limit exceeded
-- Daily and weekly limit resets on new day/week boundaries
-- Single load exceeding daily limit
-- Declined loads not counting toward limits
-- Response file writing for accepted, declined, and duplicate loads
-
-**Integration test** (`VelocityLimitsIntegrationTest` -- 1 test) replays all 1,000 lines from `input.txt` through the REST endpoint via MockMvc and asserts that the 999 non-duplicate responses match `output.txt` exactly.
 
 ---
 
@@ -143,6 +113,17 @@ All monetary values use `BigDecimal` to avoid floating-point rounding errors. Th
 ### UTC Time Boundaries
 
 Day and week boundaries are calculated in UTC using `java.time` rather than relying on the server's local timezone. This makes the service deterministic regardless of where it runs. Weeks start on Monday per ISO-8601, computed via `TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)`.
+
+### Error Handling -- Fail Closed
+
+The service is designed to fail closed: if a transaction cannot be reliably persisted, the customer receives an error rather than a silent acceptance. A global exception handler (`@RestControllerAdvice`) catches all exceptions and returns structured JSON error responses:
+
+- **Validation errors (400):** Missing or malformed fields (`id`, `customer_id`, `load_amount`, `time`) are rejected before reaching the service layer. The `load_amount` field must match the `$0.00` format.
+- **Malformed JSON (400):** Unparseable request bodies return a clear error message rather than a raw stack trace.
+- **Database errors (500):** Any failure during persistence (connection loss, write failure, constraint violation) returns a 500 with a message prompting the customer to retry. The `@Transactional` annotation ensures partial writes are rolled back.
+- **Unexpected errors (500):** A catch-all handler prevents internal details from leaking to the caller.
+
+File writing is deliberately separated from the database transaction -- the `ResponseFileWriter` is called from the controller only after the service method (and its transaction) has committed. This prevents a scenario where the output file records a response that the database rolled back. File write failures are logged but do not fail the request, since the database is the source of truth.
 
 ### Response File Output
 
