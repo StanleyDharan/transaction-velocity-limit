@@ -14,12 +14,12 @@ test:
 
 ## Run unit tests only and generate HTML report
 unit-test:
-	$(MVN) test -Dtest=LoadServiceTest
+	$(MVN) test -Dsurefire.excludes="com.venn.velocitylimits.integration.**"
 	@$(MAKE) --no-print-directory _report
 
 ## Run integration tests only and generate HTML report
 integration-test:
-	$(MVN) test -Dtest=VelocityLimitsIntegrationTest
+	$(MVN) test -Dsurefire.includes="com.venn.velocitylimits.integration.**"
 	@$(MAKE) --no-print-directory _report
 
 ## Start the service
